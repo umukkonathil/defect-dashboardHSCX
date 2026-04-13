@@ -38,31 +38,32 @@ JQL = (
 
 # ── API Setup ──────────────────────────────────────────────────────────────
 FIELDS  = 'summary,status,issuetype,priority,reporter,assignee,created,resolutiondate'
-API     = f"{JIRA_URL}/rest/api/3/search"
+API     = f"{JIRA_URL}/rest/api/3/search/jql"
 CREDS   = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_TOKEN}".encode()).decode()
 HEADERS = {
     'Authorization': f'Basic {CREDS}',
     'Accept':        'application/json',
 }
 
-def jira_get(start, batch=100):
-    params = urllib.parse.urlencode({
+def jira_get(next_page_token=None, batch=100):
+    params = {
         'jql':        JQL,
-        'startAt':    start,
         'maxResults': batch,
         'fields':     FIELDS,
-    })
-    req = urllib.request.Request(f"{API}?{params}", headers=HEADERS)
+    }
+    if next_page_token:
+        params['nextPageToken'] = next_page_token
+    req = urllib.request.Request(f"{API}?{urllib.parse.urlencode(params)}", headers=HEADERS)
     with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read().decode())
 
 # ── Fetch all pages ─────────────────────────────────────────────────────────
-issues = []
-start  = 0
+issues          = []
+next_page_token = None
 print("Fetching issues from Jira...")
 while True:
     try:
-        data = jira_get(start)
+        data = jira_get(next_page_token)
     except urllib.error.HTTPError as e:
         body = e.read().decode()
         print(f"ERROR {e.code}: {body}")
@@ -73,11 +74,10 @@ while True:
         input("Press Enter to exit...")
         exit(1)
 
-    issues += data['issues']
-    total   = data['total']
-    start  += len(data['issues'])
-    print(f"  {start} / {total} issues fetched...")
-    if start >= total:
+    issues         += data.get('issues', [])
+    next_page_token = data.get('nextPageToken')
+    print(f"  {len(issues)} issues fetched so far...")
+    if data.get('isLast', True) or not next_page_token:
         break
 
 # ── Write CSV ───────────────────────────────────────────────────────────────
