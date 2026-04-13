@@ -1,6 +1,6 @@
 import json, csv, os
-from collections import Counter
-from datetime import date
+from collections import Counter, defaultdict
+from datetime import date, datetime
 
 folder = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(folder, 'Jira_latest.csv')
@@ -15,24 +15,49 @@ statuses = Counter()
 reporters = Counter()
 issue_types = Counter()
 priorities = Counter()
+month_created = defaultdict(int)
+month_resolved = defaultdict(int)
+
+def parse_jira_date(s):
+    for fmt in ('%d/%b/%y %I:%M %p', '%d/%b/%y %I:%M%p', '%Y-%m-%dT%H:%M:%S.%f%z'):
+        try:
+            return datetime.strptime(s.strip(), fmt)
+        except ValueError:
+            pass
+    return None
 
 with open(csv_path, encoding='utf-8-sig') as f:
     reader = csv.DictReader(f)
     for row in reader:
+        created_raw  = row.get('Created','').strip()
+        resolved_raw = row.get('Resolved','').strip()
+        dt_created  = parse_jira_date(created_raw)
+        dt_resolved = parse_jira_date(resolved_raw) if resolved_raw else None
+        created_month  = dt_created.strftime('%Y-%m')  if dt_created  else ''
+        resolved_month = dt_resolved.strftime('%Y-%m') if dt_resolved else ''
         rows.append({
-            'key':      row.get('Issue key','').strip(),
-            'summary':  row.get('Summary','').strip(),
-            'status':   row.get('Status','').strip(),
-            'type':     row.get('Issue Type','').strip(),
-            'priority': row.get('Priority','').strip(),
-            'reporter': row.get('Reporter','').strip(),
-            'assignee': row.get('Assignee','').strip(),
-            'created':  row.get('Created','').strip(),
+            'key':            row.get('Issue key','').strip(),
+            'summary':        row.get('Summary','').strip(),
+            'status':         row.get('Status','').strip(),
+            'type':           row.get('Issue Type','').strip(),
+            'priority':       row.get('Priority','').strip(),
+            'reporter':       row.get('Reporter','').strip(),
+            'assignee':       row.get('Assignee','').strip(),
+            'created':        created_raw,
+            'resolved':       resolved_raw,
+            'created_month':  created_month,
+            'resolved_month': resolved_month,
+            'created_ts':     dt_created.isoformat() if dt_created else '',
+            'resolved_ts':    dt_resolved.isoformat() if dt_resolved else '',
         })
         statuses[row.get('Status','').strip()] += 1
         reporters[row.get('Reporter','').strip()] += 1
         issue_types[row.get('Issue Type','').strip()] += 1
         priorities[row.get('Priority','').strip()] += 1
+        if created_month:
+            month_created[created_month] += 1
+        if resolved_month:
+            month_resolved[resolved_month] += 1
 
 total = len(rows)
 open_statuses = ['To Do', 'In Progress', 'Blocked']
@@ -43,6 +68,31 @@ blocked_count = statuses.get('Blocked', 0)
 bug_count = issue_types.get('Bug', 0)
 critical_count = priorities.get('Critical', 0)
 reporter_count = len([r for r in reporters if r])
+
+top10 = sorted([r for r in rows if r.get('created_ts')], key=lambda r: r['created_ts'], reverse=True)[:10]
+top10_json = json.dumps(top10)
+
+top10_resolved = sorted([r for r in rows if r.get('resolved_ts')], key=lambda r: r['resolved_ts'], reverse=True)[:10]
+top10_resolved_json = json.dumps(top10_resolved)
+
+# Aging buckets for open issues
+today_dt = date.today()
+age_buckets = {'<7d': 0, '7–30d': 0, '30–90d': 0, '>90d': 0}
+for r in rows:
+    if r['status'] in open_statuses and r.get('created_ts'):
+        created_d = datetime.fromisoformat(r['created_ts']).date()
+        age = (today_dt - created_d).days
+        if age < 7:
+            age_buckets['<7d'] += 1
+        elif age < 30:
+            age_buckets['7–30d'] += 1
+        elif age < 90:
+            age_buckets['30–90d'] += 1
+        else:
+            age_buckets['>90d'] += 1
+age_labels = ['<7d', '7–30d', '30–90d', '>90d']
+age_data   = [age_buckets[k] for k in age_labels]
+age_colors_js = json.dumps(['#22c55e', '#f59e0b', '#f97316', '#ef4444'])
 
 try:
     today = date.today().strftime('%#d %B %Y')  # Windows
@@ -71,6 +121,13 @@ type_labels = [t for t in type_order if issue_types.get(t,0)>0] + [t for t in is
 type_data   = [issue_types[t] for t in type_labels]
 type_bg     = ['#6366f1','#0ea5e9','#f97316','#a855f7','#ec4899','#14b8a6']
 type_bg_js  = json.dumps((type_bg * (len(type_labels)//len(type_bg)+1))[:len(type_labels)])
+
+# Build issues by created month — split by current status (open vs closed)
+all_months_set    = sorted(month_created.keys())
+month_labels_disp = [datetime.strptime(m, '%Y-%m').strftime('%b %Y') for m in all_months_set]
+created_open_monthly   = [sum(1 for r in rows if r['created_month']==m and r['status'] in open_statuses)   for m in all_months_set]
+created_closed_monthly = [sum(1 for r in rows if r['created_month']==m and r['status'] in closed_statuses) for m in all_months_set]
+all_months_js = json.dumps(all_months_set)
 
 # Build priority chart
 pri_order = ['Medium','High','Critical','Low']
@@ -135,6 +192,13 @@ html = f"""<!DOCTYPE html>
     .p-medium{{background:#fef9c3;color:#92400e;}}
     .p-low{{background:#dcfce7;color:#15803d;}}
     footer{{text-align:center;color:#94a3b8;font-size:.8rem;margin-top:16px;}}
+    .rank{{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#f1f5f9;color:#64748b;font-size:.75rem;font-weight:700;}}
+    .it tr.clickrow:hover td{{background:#eff6ff;cursor:pointer;}}
+    .age-pill{{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.78rem;font-weight:600;}}
+    .age-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}}
+    .age-box{{border-radius:10px;padding:16px;text-align:center;}}
+    .age-box .num{{font-size:2rem;font-weight:800;}}
+    .age-box .lbl{{font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}}
   </style>
 </head>
 <body>
@@ -190,9 +254,49 @@ html = f"""<!DOCTYPE html>
 </div>
 
 <div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+      Latest 10 Defects &nbsp;<small style="color:#94a3b8;font-size:.75rem;font-weight:400">most recently created</small>
+      <button onclick="show('All Issues','all',[])" style="font-size:.75rem;padding:5px 16px;border:1px solid #e2e8f0;border-radius:20px;background:white;color:#0052cc;cursor:pointer;font-weight:600;transition:background .15s;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='white'">View All</button>
+    </h2>
+    <div id="top10table"></div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+      Latest 10 Resolved Issues &nbsp;<small style="color:#94a3b8;font-size:.75rem;font-weight:400">most recently resolved</small>
+      <button onclick="show('Resolved / Closed','status',['Done',&quot;Won\\'t Do&quot;,'Not a Bug','Cannot Reproduce','Duplicate'])" style="font-size:.75rem;padding:5px 16px;border:1px solid #e2e8f0;border-radius:20px;background:white;color:#22c55e;cursor:pointer;font-weight:600;transition:background .15s;" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background='white'">View All Resolved</button>
+    </h2>
+    <div id="top10resolvedtable"></div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr">
   <div class="card tall">
     <h2>Issues by Reporter <small style="color:#94a3b8;font-size:.75rem">(click bar)</small></h2>
     <div class="chart-wrap"><canvas id="cRep"></canvas></div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card tall">
+    <h2>Issues by Created Month <small style="color:#94a3b8;font-size:.75rem">(click bar to drill in — open vs closed by current status)</small></h2>
+    <div class="chart-wrap"><canvas id="cMonthly"></canvas></div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr">
+  <div class="card">
+    <h2>Open Issue Age Analysis <small style="color:#94a3b8;font-size:.75rem">(click segment to drill in)</small></h2>
+    <div class="age-grid">
+      <div class="age-box" style="background:#dcfce7;color:#15803d;" id="age0" onclick="showAge('<7d')"><div class="num" id="age0n"></div><div class="lbl">&lt; 7 Days</div></div>
+      <div class="age-box" style="background:#fef9c3;color:#92400e;" id="age1" onclick="showAge('7–30d')"><div class="num" id="age1n"></div><div class="lbl">7 – 30 Days</div></div>
+      <div class="age-box" style="background:#ffedd5;color:#c2410c;" id="age2" onclick="showAge('30–90d')"><div class="num" id="age2n"></div><div class="lbl">30 – 90 Days</div></div>
+      <div class="age-box" style="background:#fee2e2;color:#b91c1c;" id="age3" onclick="showAge('>90d')"><div class="num" id="age3n"></div><div class="lbl">&gt; 90 Days</div></div>
+    </div>
+    <div class="chart-wrap" style="height:220px;"><canvas id="cAge"></canvas></div>
   </div>
 </div>
 
@@ -213,12 +317,17 @@ html = f"""<!DOCTYPE html>
 
 <script>
 const DATA = {data_json};
+const OPEN_ST   = {json.dumps(open_statuses)};
+const CLOSED_ST = {json.dumps(closed_statuses)};
 let cur = [];
 const sCls = s => ({{'To Do':'s-todo','Done':'s-done',"Won't Do":'s-wont','In Progress':'s-prog','Blocked':'s-block'}}[s]||'s-other');
 const pCls = p => ({{'Critical':'p-critical','High':'p-high','Medium':'p-medium','Low':'p-low'}}[p]||'s-other');
 
 function show(title, field, vals){{
-  cur = field==='all' ? DATA : field==='reporter' ? DATA.filter(r=>r.reporter===vals[0]) : DATA.filter(r=>vals.includes(r[field]));
+  cur = field==='all' ? DATA
+      : field==='reporter' ? DATA.filter(r=>r.reporter===vals[0])
+      : (field==='created_month'||field==='resolved_month') ? DATA.filter(r=>vals.includes(r[field]))
+      : DATA.filter(r=>vals.includes(r[field]));
   document.getElementById('mtitle').textContent = title;
   document.getElementById('msearch').value = '';
   render();
@@ -229,8 +338,8 @@ function render(){{
   const rows = q ? cur.filter(r=>[r.key,r.summary,r.reporter,r.assignee,r.priority,r.status,r.type].join(' ').toLowerCase().includes(q)) : cur;
   document.getElementById('mcount').textContent = rows.length + ' issue' + (rows.length!==1?'s':'');
   if(!rows.length){{ document.getElementById('mtable').innerHTML='<p style="color:#94a3b8;text-align:center;padding:32px">No matching issues.</p>'; return; }}
-  let h='<table class="it"><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Type</th><th>Reporter</th><th>Assignee</th><th>Created</th></tr></thead><tbody>';
-  rows.forEach(r=>{{ h+=`<tr><td class="ikey">${{r.key}}</td><td class="isum">${{r.summary}}</td><td><span class="pill ${{sCls(r.status)}}">${{r.status}}</span></td><td><span class="pill ${{pCls(r.priority)}}">${{r.priority}}</span></td><td>${{r.type}}</td><td>${{r.reporter}}</td><td>${{r.assignee||'&mdash;'}}</td><td style="white-space:nowrap">${{r.created}}</td></tr>`; }});
+  let h='<table class="it"><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Type</th><th>Reporter</th><th>Assignee</th><th>Created</th><th>Resolved</th></tr></thead><tbody>';
+  rows.forEach(r=>{{ h+=`<tr><td class="ikey">${{r.key}}</td><td class="isum">${{r.summary}}</td><td><span class="pill ${{sCls(r.status)}}">${{r.status}}</span></td><td><span class="pill ${{pCls(r.priority)}}">${{r.priority}}</span></td><td>${{r.type}}</td><td>${{r.reporter}}</td><td>${{r.assignee||'&mdash;'}}</td><td style="white-space:nowrap">${{r.created}}</td><td style="white-space:nowrap">${{r.resolved||'&mdash;'}}</td></tr>`; }});
   h+='</tbody></table>';
   document.getElementById('mtable').innerHTML = h;
 }}
@@ -251,11 +360,126 @@ new Chart('cOpen',{{type:'doughnut',data:{{labels:['Open / Active','Resolved / C
 new Chart('cType',{{type:'bar',data:{{labels:{json.dumps(type_labels)},datasets:[{{label:'Count',data:{json.dumps(type_data)},backgroundColor:{type_bg_js},borderRadius:6}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{y:{{beginAtZero:true}}}}, ...handler('type')}}}});
 new Chart('cPri',{{type:'bar',data:{{labels:{json.dumps(pri_labels)},datasets:[{{label:'Count',data:{json.dumps(pri_data)},backgroundColor:{pri_bg_js},borderRadius:6}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{y:{{beginAtZero:true}}}}, ...handler('priority')}}}});
 new Chart('cRep',{{type:'bar',data:{{labels:{json.dumps(rep_labels)},datasets:[{{label:'Issues',data:{json.dumps(rep_data)},backgroundColor:{rep_colors_js},borderRadius:6}}]}},options:{{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{x:{{beginAtZero:true}},y:{{ticks:{{font:{{size:13}}}}}}}},onClick(_,items){{if(!items.length)return;const n=this.data.labels[items[0].index];show('Reporter: '+n,'reporter',[n]);}},onHover(_,__,chart){{chart.canvas.style.cursor='pointer';}}}}}});
+
+const MONTH_KEYS  = {all_months_js};
+const MONTH_DISPS = {json.dumps(month_labels_disp)};
+new Chart('cMonthly',{{
+  type:'bar',
+  data:{{
+    labels:MONTH_DISPS,
+    datasets:[
+      {{label:'Still Open',     data:{json.dumps(created_open_monthly)},   backgroundColor:'rgba(14,165,233,0.8)', borderRadius:4}},
+      {{label:'Resolved/Closed',data:{json.dumps(created_closed_monthly)}, backgroundColor:'rgba(34,197,94,0.8)',  borderRadius:4}}
+    ]
+  }},
+  options:{{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{{legend:{{position:'top',labels:{{boxWidth:14,font:{{size:12}}}}}}}},
+    scales:{{y:{{beginAtZero:true,ticks:{{stepSize:1}}}},x:{{ticks:{{font:{{size:11}}}}}}}},
+    onClick(_,items){{
+      if(!items.length) return;
+      const idx=items[0].index, dsIdx=items[0].datasetIndex;
+      const mkey=MONTH_KEYS[idx], lbl=MONTH_DISPS[idx];
+      const stList = dsIdx===0 ? OPEN_ST : CLOSED_ST;
+      const label  = dsIdx===0 ? 'Still Open — '+lbl : 'Resolved/Closed — '+lbl;
+      cur = DATA.filter(r=>r.created_month===mkey && stList.includes(r.status));
+      document.getElementById('mtitle').textContent=label;
+      document.getElementById('msearch').value='';
+      render();
+      document.getElementById('overlay').classList.add('open');
+    }},
+    onHover(_,__,chart){{chart.canvas.style.cursor='pointer';}}
+  }}
+}});
+
+// ── Top 10 Latest Defects ──
+const TOP10 = {top10_json};
+(function(){{
+  let h='<table class="it"><thead><tr><th>#</th><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Created</th></tr></thead><tbody>';
+  TOP10.forEach((r,i)=>{{
+    h+=`<tr class="clickrow" onclick="show('${{r.key}}','key',['${{r.key}}'])">
+      <td><span class="rank">${{i+1}}</span></td>
+      <td class="ikey">${{r.key}}</td>
+      <td class="isum">${{r.summary}}</td>
+      <td><span class="pill ${{sCls(r.status)}}">${{r.status}}</span></td>
+      <td><span class="pill ${{pCls(r.priority)}}">${{r.priority}}</span></td>
+      <td>${{r.reporter}}</td>
+      <td>${{r.assignee||'&mdash;'}}</td>
+      <td style="white-space:nowrap">${{r.created}}</td>
+    </tr>`;
+  }});
+  h+='</tbody></table>';
+  document.getElementById('top10table').innerHTML=h;
+}})();
+
+// ── Top 10 Latest Resolved Issues ──
+const TOP10_RESOLVED = {top10_resolved_json};
+(function(){{
+  if(!TOP10_RESOLVED.length){{
+    document.getElementById('top10resolvedtable').innerHTML='<p style="color:#94a3b8;text-align:center;padding:32px">No resolved issues found.</p>';
+    return;
+  }}
+  let h='<table class="it"><thead><tr><th>#</th><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Resolved</th></tr></thead><tbody>';
+  TOP10_RESOLVED.forEach((r,i)=>{{
+    h+=`<tr class="clickrow" onclick="show('${{r.key}}','key',['${{r.key}}'])">
+      <td><span class="rank">${{i+1}}</span></td>
+      <td class="ikey">${{r.key}}</td>
+      <td class="isum">${{r.summary}}</td>
+      <td><span class="pill ${{sCls(r.status)}}">${{r.status}}</span></td>
+      <td><span class="pill ${{pCls(r.priority)}}">${{r.priority}}</span></td>
+      <td>${{r.reporter}}</td>
+      <td>${{r.assignee||'&mdash;'}}</td>
+      <td style="white-space:nowrap">${{r.resolved}}</td>
+    </tr>`;
+  }});
+  h+='</tbody></table>';
+  document.getElementById('top10resolvedtable').innerHTML=h;
+}})();
+
+// ── Aging Analysis ──
+const AGE_DATA = {json.dumps(age_data)};
+const AGE_LABELS = {json.dumps(age_labels)};
+const AGE_COLORS = {age_colors_js};
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+
+// Populate mini KPI boxes
+AGE_DATA.forEach((v,i)=>{{ document.getElementById('age'+i+'n').textContent=v; }});
+
+new Chart('cAge',{{
+  type:'bar',
+  data:{{labels:AGE_LABELS,datasets:[{{label:'Open Issues',data:AGE_DATA,backgroundColor:AGE_COLORS,borderRadius:6}}]}},
+  options:{{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{{legend:{{display:false}},tooltip:{{callbacks:{{label:ctx=>ctx.raw+' open issues'}}}}}},
+    scales:{{y:{{beginAtZero:true,ticks:{{stepSize:1}}}},x:{{ticks:{{font:{{size:13}}}}}}}},
+    onClick(_,items){{if(!items.length)return;showAge(AGE_LABELS[items[0].index]);}},
+    onHover(_,__,chart){{chart.canvas.style.cursor='pointer';}}
+  }}
+}});
+
+function showAge(bucket){{
+  const now = new Date(); now.setHours(0,0,0,0);
+  const filtered = DATA.filter(r=>{{
+    if(!OPEN_ST.includes(r.status)||!r.created_ts) return false;
+    const d=new Date(r.created_ts); d.setHours(0,0,0,0);
+    const age=Math.floor((now-d)/(1000*60*60*24));
+    if(bucket==='<7d')   return age<7;
+    if(bucket==='7–30d') return age>=7&&age<30;
+    if(bucket==='30–90d')return age>=30&&age<90;
+    if(bucket==='>90d')  return age>=90;
+    return false;
+  }});
+  cur=filtered;
+  document.getElementById('mtitle').textContent='Open Issues aged '+bucket;
+  document.getElementById('msearch').value='';
+  render();
+  document.getElementById('overlay').classList.add('open');
+}}
 </script>
 </body>
 </html>"""
 
-out_path = os.path.join(folder, 'jira_latest_report.html')
+out_path = os.path.join(folder, 'HS CX-Defect.html')
 with open(out_path, 'w', encoding='utf-8') as f:
     f.write(html)
 
