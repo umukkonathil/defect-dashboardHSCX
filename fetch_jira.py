@@ -11,8 +11,8 @@ if os.path.exists(env_path):
                 k, v = line.split('=', 1)
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
-JIRA_URL   = os.environ.get('JIRA_URL', 'https://datavant.atlassian.net').rstrip('/')
-JIRA_EMAIL = os.environ.get('JIRA_EMAIL', 'usha.mukkonathil@datavant.com')
+JIRA_URL   = os.environ.get('JIRA_URL', '').rstrip('/')
+JIRA_EMAIL = os.environ.get('JIRA_EMAIL', '')
 JIRA_TOKEN = os.environ.get('JIRA_TOKEN', '')
 
 if not JIRA_TOKEN:
