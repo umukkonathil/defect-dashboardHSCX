@@ -1,1 +1,8 @@
-.env
+# Ignore everything by default
+*
+
+# Keep .gitignore itself tracked
+!.gitignore
+
+# Only allow the dashboard HTML to be pushed
+!"HS CX-Defect.html"
