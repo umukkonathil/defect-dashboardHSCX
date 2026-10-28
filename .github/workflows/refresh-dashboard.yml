@@ -1,0 +1,63 @@
+name: Refresh defect dashboard
+
+on:
+  # Daily at 12:00 UTC (8am US Eastern in summer, 7am in winter). Edit the cron to change.
+  schedule:
+    - cron: "0 12 * * *"
+  # Lets you run it by hand: GitHub > Actions > Refresh defect dashboard > Run workflow
+  workflow_dispatch:
+  # TEST ONLY: runs on every push to the test branch. Remove before merging to main.
+  push:
+    branches: [feat/github-actions-refresh]
+
+permissions:
+  contents: write   # needed so the job can commit the refreshed HTML
+
+concurrency:
+  group: dashboard-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch issues from Jira
+        env:
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+        run: python fetch_jira.py
+
+      - name: Build dashboard
+        env:
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+        run: python gen_report.py
+
+      # On the test branch, keep the result as a downloadable file instead of committing it.
+      - name: Save dashboard as artifact (test runs only)
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard
+          path: "HS CX-Defect.html"
+
+      # On main (the scheduled run), commit and push the refreshed dashboard.
+      - name: Commit and push dashboard
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "HS CX-Defect.html"
+          if git diff --cached --quiet; then
+            echo "Dashboard unchanged - nothing to commit."
+          else
+            git commit -m "Dashboard refresh - $(date -u +%Y-%m-%d)"
+            git push origin main
+          fi
