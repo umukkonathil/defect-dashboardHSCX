@@ -1,0 +1,83 @@
+name: Refresh defect dashboard
+
+on:
+  # Daily at 12:00 UTC (8am US Eastern in summer, 7am in winter). Edit the cron to change.
+  schedule:
+    - cron: "0 12 * * *"
+  # Lets you run it by hand: GitHub > Actions > Refresh defect dashboard > Run workflow
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed so the job can commit the refreshed HTML
+
+concurrency:
+  group: dashboard-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Credentials come from ONE secret named DEFECT_DASHBOARD holding the whole .env file
+      # (JIRA_URL=..., JIRA_EMAIL=..., JIRA_TOKEN=...), or from three separate secrets.
+      - name: Prepare Jira credentials
+        env:
+          DEFECT_DASHBOARD: ${{ secrets.DEFECT_DASHBOARD }}
+          S_URL: ${{ secrets.JIRA_URL }}
+          S_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          S_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          S_JQL: ${{ secrets.JIRA_JQL }}
+        run: |
+          if [ -n "$DEFECT_DASHBOARD" ]; then
+            printf '%s\n' "$DEFECT_DASHBOARD" | tr -d '\r' > .env
+            echo "Using credentials from secret DEFECT_DASHBOARD"
+          else
+            printf 'JIRA_URL=%s\nJIRA_EMAIL=%s\nJIRA_TOKEN=%s\nJIRA_JQL=%s\n' "$S_URL" "$S_EMAIL" "$S_TOKEN" "$S_JQL" > .env
+            echo "Using the separate JIRA_* secrets"
+          fi
+          for v in JIRA_URL JIRA_EMAIL JIRA_TOKEN JIRA_JQL; do
+            if ! grep -qE "^$v=.+" .env; then echo "::error title=Credential missing::$v has no value (check the secret)"; fi
+          done
+          echo "JIRA_URL host: $(grep -E '^JIRA_URL=' .env | sed -E 's#^JIRA_URL=\"?(https?://)?([^/\"]*).*#\2#')"
+
+      - name: Fetch issues from Jira
+        run: |
+          if ! python fetch_jira.py > fetch.log 2>&1; then
+            cat fetch.log
+            msg=$(tail -n 3 fetch.log | tr '\n' ' ' | cut -c1-400)
+            echo "::error title=Jira fetch failed::$msg"
+            exit 1
+          fi
+          cat fetch.log
+
+      - name: Build dashboard
+        run: python gen_report.py
+
+      # On the test branch, keep the result as a downloadable file instead of committing it.
+      - name: Save dashboard as artifact (test runs only)
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard
+          path: "HS CX-Defect.html"
+
+      # On main (the scheduled run), commit and push the refreshed dashboard.
+      - name: Commit and push dashboard
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "HS CX-Defect.html"
+          if git diff --cached --quiet; then
+            echo "Dashboard unchanged - nothing to commit."
+          else
+            git commit -m "Dashboard refresh - $(date -u +%Y-%m-%d)"
+            git push origin main
+          fi

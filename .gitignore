@@ -1,8 +1,15 @@
-# Ignore everything by default
+# Ignore everything by default (keeps .env, CSVs, logs off GitHub)
 *
 
 # Keep .gitignore itself tracked
 !.gitignore
 
-# Only allow the dashboard HTML to be pushed
+# The published dashboard
 !"HS CX-Defect.html"
+
+# Scripts + workflow needed to rebuild the dashboard on GitHub
+!fetch_jira.py
+!gen_report.py
+!.github/
+!.github/workflows/
+!.github/workflows/refresh-dashboard.yml
