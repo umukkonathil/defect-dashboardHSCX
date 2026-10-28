@@ -28,16 +28,29 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fetch issues from Jira
+      # Credentials come from ONE secret named DEFECT_DASHBOARD holding the whole .env file
+      # (JIRA_URL=..., JIRA_EMAIL=..., JIRA_TOKEN=...), or from three separate secrets.
+      - name: Prepare Jira credentials
         env:
-          JIRA_URL: ${{ secrets.JIRA_URL }}
-          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
-          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          DEFECT_DASHBOARD: ${{ secrets.DEFECT_DASHBOARD }}
+          S_URL: ${{ secrets.JIRA_URL }}
+          S_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          S_TOKEN: ${{ secrets.JIRA_TOKEN }}
         run: |
+          if [ -n "$DEFECT_DASHBOARD" ]; then
+            printf '%s\n' "$DEFECT_DASHBOARD" | tr -d '\r' > .env
+            echo "Using credentials from secret DEFECT_DASHBOARD"
+          else
+            printf 'JIRA_URL=%s\nJIRA_EMAIL=%s\nJIRA_TOKEN=%s\n' "$S_URL" "$S_EMAIL" "$S_TOKEN" > .env
+            echo "Using the three separate JIRA_* secrets"
+          fi
           for v in JIRA_URL JIRA_EMAIL JIRA_TOKEN; do
-            if [ -z "${!v}" ]; then echo "::error title=Secret missing::$v is empty or not set"; fi
+            if ! grep -qE "^$v=.+" .env; then echo "::error title=Credential missing::$v has no value (check the secret)"; fi
           done
-          echo "JIRA_URL host: $(echo "$JIRA_URL" | sed -E 's#^(https?://)?([^/]*).*#\2#')"
+          echo "JIRA_URL host: $(grep -E '^JIRA_URL=' .env | sed -E 's#^JIRA_URL=\"?(https?://)?([^/\"]*).*#\2#')"
+
+      - name: Fetch issues from Jira
+        run: |
           if ! python fetch_jira.py > fetch.log 2>&1; then
             cat fetch.log
             msg=$(tail -n 3 fetch.log | tr '\n' ' ' | cut -c1-400)
@@ -47,8 +60,6 @@ jobs:
           cat fetch.log
 
       - name: Build dashboard
-        env:
-          JIRA_URL: ${{ secrets.JIRA_URL }}
         run: python gen_report.py
 
       # On the test branch, keep the result as a downloadable file instead of committing it.
