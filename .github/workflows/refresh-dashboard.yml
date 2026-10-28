@@ -6,9 +6,6 @@ on:
     - cron: "0 12 * * *"
   # Lets you run it by hand: GitHub > Actions > Refresh defect dashboard > Run workflow
   workflow_dispatch:
-  # TEST ONLY: runs on every push to the test branch. Remove before merging to main.
-  push:
-    branches: [feat/github-actions-refresh]
 
 permissions:
   contents: write   # needed so the job can commit the refreshed HTML
