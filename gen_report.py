@@ -188,6 +188,10 @@ html = f"""<!DOCTYPE html>
     #msearch{{width:100%;padding:9px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;margin-bottom:16px;outline:none;}}
     #msearch:focus{{border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.15);}}
     .it{{width:100%;border-collapse:collapse;font-size:.84rem;}}
+    .it th.sortable{{cursor:pointer;user-select:none;}}
+    .it th.sortable:hover{{color:#0ea5e9;}}
+    .it th .arr{{display:inline-block;width:12px;margin-left:4px;font-size:.62rem;color:#cbd5e1;}}
+    .it th.sorted .arr{{color:#0ea5e9;}}
     .it th{{background:#f8fafc;padding:9px 10px;text-align:left;font-size:.74rem;text-transform:uppercase;letter-spacing:.4px;color:#64748b;border-bottom:2px solid #e2e8f0;white-space:nowrap;}}
     .it td{{padding:9px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;}}
     .it tr:last-child td{{border-bottom:none;}}
@@ -348,16 +352,43 @@ function show(title, field, vals){{
       : DATA.filter(r=>vals.includes(r[field]));
   document.getElementById('mtitle').textContent = title;
   document.getElementById('msearch').value = '';
+  sortKey = null;
   render();
   document.getElementById('overlay').classList.add('open');
+}}
+let sortKey = null, sortDir = 1;
+const PRI_RANK = {{'Critical':0,'High':1,'Medium':2,'Low':3}};
+const COLS = [['key','Key'],['summary','Summary'],['status','Status'],['priority','Priority'],['type','Type'],['reporter','Reporter'],['assignee','Assignee'],['created','Created'],['resolved','Resolved']];
+function sortVal(r,k){{
+  if(k==='created'||k==='resolved') return r[k+'_ts'] ? Date.parse(r[k+'_ts']) : '';
+  if(k==='priority') return r.priority in PRI_RANK ? PRI_RANK[r.priority] : 99;
+  if(k==='key'){{ const m=/^(.*?)-([0-9]+)$/.exec(r.key); return m ? [m[1],+m[2]] : [r.key,0]; }}
+  return (r[k]||'').toLowerCase();
+}}
+function cmpRows(a,b){{
+  const x=sortVal(a,sortKey), y=sortVal(b,sortKey);
+  if(x===''&&y==='') return 0;
+  if(x==='') return 1;            // blanks always sink to the bottom
+  if(y==='') return -1;
+  let c;
+  if(Array.isArray(x)) c = x[0].localeCompare(y[0]) || x[1]-y[1];
+  else if(typeof x==='number') c = x-y;
+  else c = x<y ? -1 : x>y ? 1 : 0;
+  return c*sortDir;
+}}
+function sortBy(k){{
+  if(sortKey===k) sortDir = -sortDir;
+  else {{ sortKey=k; sortDir = (k==='created'||k==='resolved') ? -1 : 1; }}   // dates: newest first
+  render();
 }}
 function render(){{
   const q = document.getElementById('msearch').value.toLowerCase();
   const rows = q ? cur.filter(r=>[r.key,r.summary,r.reporter,r.assignee,r.priority,r.status,r.type].join(' ').toLowerCase().includes(q)) : cur;
   document.getElementById('mcount').textContent = rows.length + ' issue' + (rows.length!==1?'s':'');
   if(!rows.length){{ document.getElementById('mtable').innerHTML='<p style="color:#94a3b8;text-align:center;padding:32px">No matching issues.</p>'; return; }}
-  let h='<table class="it"><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Type</th><th>Reporter</th><th>Assignee</th><th>Created</th><th>Resolved</th></tr></thead><tbody>';
-  rows.forEach(r=>{{ h+=`<tr><td class="ikey">${{keyLink(r.key)}}</td><td class="isum">${{r.summary}}</td><td><span class="pill ${{sCls(r.status)}}">${{r.status}}</span></td><td><span class="pill ${{pCls(r.priority)}}">${{r.priority}}</span></td><td>${{r.type}}</td><td>${{r.reporter}}</td><td>${{r.assignee||'&mdash;'}}</td><td style="white-space:nowrap">${{r.created}}</td><td style="white-space:nowrap">${{r.resolved||'&mdash;'}}</td></tr>`; }});
+  const sorted = sortKey ? rows.slice().sort(cmpRows) : rows;
+  let h='<table class="it"><thead><tr>'+COLS.map(([k,l])=>`<th class="sortable${{k===sortKey?' sorted':''}}" onclick="sortBy('${{k}}')">${{l}}<span class="arr">${{k===sortKey?(sortDir===1?'&#9650;':'&#9660;'):'&#8645;'}}</span></th>`).join('')+'</tr></thead><tbody>';
+  sorted.forEach(r=>{{ h+=`<tr><td class="ikey">${{keyLink(r.key)}}</td><td class="isum">${{r.summary}}</td><td><span class="pill ${{sCls(r.status)}}">${{r.status}}</span></td><td><span class="pill ${{pCls(r.priority)}}">${{r.priority}}</span></td><td>${{r.type}}</td><td>${{r.reporter}}</td><td>${{r.assignee||'&mdash;'}}</td><td style="white-space:nowrap">${{r.created}}</td><td style="white-space:nowrap">${{r.resolved||'&mdash;'}}</td></tr>`; }});
   h+='</tbody></table>';
   document.getElementById('mtable').innerHTML = h;
 }}
@@ -403,6 +434,7 @@ new Chart('cMonthly',{{
       cur = DATA.filter(r=>r.created_month===mkey && stList.includes(r.status));
       document.getElementById('mtitle').textContent=label;
       document.getElementById('msearch').value='';
+      sortKey = null;
       render();
       document.getElementById('overlay').classList.add('open');
     }},
@@ -490,6 +522,7 @@ function showAge(bucket){{
   cur=filtered;
   document.getElementById('mtitle').textContent='Open Issues aged '+bucket;
   document.getElementById('msearch').value='';
+  sortKey = null;
   render();
   document.getElementById('overlay').classList.add('open');
 }}

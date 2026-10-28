@@ -25,20 +25,12 @@ if not JIRA_TOKEN:
     sys.exit(1)
 
 # ── JQL Filter ─────────────────────────────────────────────────────────────
-JQL = (
-    'created >= -400d '
-    'and spaceJira IN (HealthSource,"ROI Operations","ROI Newfire") '
-    'AND reporter in ('
-    '712020:2e29551d-b655-4750-a692-251520ee4fa9,'
-    '712020:111f29bf-9083-4bd1-b7d4-c17316d2f629,'
-    '712020:72958af4-0bec-4287-b6fb-c453b007f1f6,'
-    '712020:0d0931ed-5ebb-4cd3-82d3-37787c6fa74c,'
-    '712020:d3cf2c8f-8b24-4711-97bf-da1bfd65094d,'
-    '712020:978137f2-007d-4588-94b6-b3c05c33ab85,'
-    '712020:48d35342-b2cd-476c-beda-a66342a97913,'
-    '712020:6c2cff0f-d349-4985-9a4f-8c726499438c'
-    ')'
-)
+# Kept out of the repo on purpose (it names projects and people): set JIRA_JQL in .env
+# locally, or in the DEFECT_DASHBOARD secret on GitHub.
+JQL = os.environ.get('JIRA_JQL', '').strip()
+if not JQL:
+    print("ERROR: JIRA_JQL not set. Add the search filter to the .env file / GitHub secret.")
+    sys.exit(1)
 
 # ── API Setup ──────────────────────────────────────────────────────────────
 FIELDS  = 'summary,status,issuetype,priority,reporter,assignee,created,resolutiondate'

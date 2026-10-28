@@ -6,6 +6,9 @@ on:
     - cron: "0 12 * * *"
   # Lets you run it by hand: GitHub > Actions > Refresh defect dashboard > Run workflow
   workflow_dispatch:
+  # TEST ONLY: runs on every push to the test branch. Remove before merging to main.
+  push:
+    branches: [feat/github-actions-refresh]
 
 permissions:
   contents: write   # needed so the job can commit the refreshed HTML
@@ -33,15 +36,16 @@ jobs:
           S_URL: ${{ secrets.JIRA_URL }}
           S_EMAIL: ${{ secrets.JIRA_EMAIL }}
           S_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          S_JQL: ${{ secrets.JIRA_JQL }}
         run: |
           if [ -n "$DEFECT_DASHBOARD" ]; then
             printf '%s\n' "$DEFECT_DASHBOARD" | tr -d '\r' > .env
             echo "Using credentials from secret DEFECT_DASHBOARD"
           else
-            printf 'JIRA_URL=%s\nJIRA_EMAIL=%s\nJIRA_TOKEN=%s\n' "$S_URL" "$S_EMAIL" "$S_TOKEN" > .env
-            echo "Using the three separate JIRA_* secrets"
+            printf 'JIRA_URL=%s\nJIRA_EMAIL=%s\nJIRA_TOKEN=%s\nJIRA_JQL=%s\n' "$S_URL" "$S_EMAIL" "$S_TOKEN" "$S_JQL" > .env
+            echo "Using the separate JIRA_* secrets"
           fi
-          for v in JIRA_URL JIRA_EMAIL JIRA_TOKEN; do
+          for v in JIRA_URL JIRA_EMAIL JIRA_TOKEN JIRA_JQL; do
             if ! grep -qE "^$v=.+" .env; then echo "::error title=Credential missing::$v has no value (check the secret)"; fi
           done
           echo "JIRA_URL host: $(grep -E '^JIRA_URL=' .env | sed -E 's#^JIRA_URL=\"?(https?://)?([^/\"]*).*#\2#')"
