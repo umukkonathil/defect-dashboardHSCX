@@ -33,7 +33,18 @@ jobs:
           JIRA_URL: ${{ secrets.JIRA_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
-        run: python fetch_jira.py
+        run: |
+          for v in JIRA_URL JIRA_EMAIL JIRA_TOKEN; do
+            if [ -z "${!v}" ]; then echo "::error title=Secret missing::$v is empty or not set"; fi
+          done
+          echo "JIRA_URL host: $(echo "$JIRA_URL" | sed -E 's#^(https?://)?([^/]*).*#\2#')"
+          if ! python fetch_jira.py > fetch.log 2>&1; then
+            cat fetch.log
+            msg=$(tail -n 3 fetch.log | tr '\n' ' ' | cut -c1-400)
+            echo "::error title=Jira fetch failed::$msg"
+            exit 1
+          fi
+          cat fetch.log
 
       - name: Build dashboard
         env:
