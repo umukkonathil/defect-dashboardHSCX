@@ -1,9 +1,12 @@
 name: Refresh defect dashboard
 
 on:
-  # Daily at 12:00 UTC (8am US Eastern in summer, 7am in winter). Edit the cron to change.
+  # Twice a day, at 10:17 am and 3:17 pm EST (= 15:17 and 20:17 UTC). GitHub cron is UTC only
+  # and ignores daylight saving, so in US summer time (EDT) these run an hour later on the clock.
+  # The :17 minute is deliberate: runs at the top of the hour are the most likely to be delayed.
   schedule:
-    - cron: "0 12 * * *"
+    - cron: "17 15 * * *"
+    - cron: "17 20 * * *"
   # Lets you run it by hand: GitHub > Actions > Refresh defect dashboard > Run workflow
   workflow_dispatch:
 
