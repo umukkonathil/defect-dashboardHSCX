@@ -4,9 +4,13 @@ on:
   # Twice a day, at 10:17 am and 3:17 pm EST (= 15:17 and 20:17 UTC). GitHub cron is UTC only
   # and ignores daylight saving, so in US summer time (EDT) these run an hour later on the clock.
   # The :17 minute is deliberate: runs at the top of the hour are the most likely to be delayed.
+  # Each slot has a retry an hour later (16:17 and 21:17 UTC) because GitHub sometimes drops a
+  # scheduled run. A retry after a good run just re-fetches and only commits if something changed.
   schedule:
     - cron: "17 15 * * *"
+    - cron: "17 16 * * *"
     - cron: "17 20 * * *"
+    - cron: "17 21 * * *"
   # Lets you run it by hand: GitHub > Actions > Refresh defect dashboard > Run workflow
   workflow_dispatch:
 
