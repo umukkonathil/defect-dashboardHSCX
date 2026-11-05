@@ -33,7 +33,13 @@ if not JQL:
     sys.exit(1)
 
 # ── API Setup ──────────────────────────────────────────────────────────────
-FIELDS  = 'summary,status,issuetype,priority,reporter,assignee,created,resolutiondate'
+# 'labels' identifies enhancements (label "enhancement"). Optional: set JIRA_THEME_FIELD to the
+# customfield id of the Issue Theme dropdown (e.g. customfield_12345) once it exists; its value is
+# written to a 'Theme' CSV column, ready for a theme chart in gen_report.py.
+THEME_FIELD = os.environ.get('JIRA_THEME_FIELD', '').strip()
+FIELDS  = 'summary,status,issuetype,priority,reporter,assignee,created,resolutiondate,labels'
+if THEME_FIELD:
+    FIELDS += ',' + THEME_FIELD
 API     = f"{JIRA_URL}/rest/api/3/search/jql"
 CREDS   = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_TOKEN}".encode()).decode()
 HEADERS = {
@@ -113,7 +119,19 @@ if not issues:
 # ── Write CSV ───────────────────────────────────────────────────────────────
 csv_path = os.path.join(folder, 'Jira_latest.csv')
 COLS = ['Issue key', 'Summary', 'Status', 'Issue Type', 'Priority',
-        'Reporter', 'Assignee', 'Created', 'Resolved']
+        'Reporter', 'Assignee', 'Created', 'Resolved', 'Labels']
+if THEME_FIELD:
+    COLS.append('Theme')
+
+
+def field_text(v):
+    """Text of a Jira dropdown value (single or multi select)."""
+    if isinstance(v, list):
+        return '; '.join(field_text(x) for x in v)
+    if isinstance(v, dict):
+        return v.get('value') or v.get('name') or ''
+    return v or ''
+
 
 with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
     w = csv.DictWriter(f, fieldnames=COLS)
@@ -130,6 +148,8 @@ with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
             'Assignee':   (flds.get('assignee')   or {}).get('displayName', ''),
             'Created':    flds.get('created', '') or '',
             'Resolved':   flds.get('resolutiondate', '') or '',
+            'Labels':     ';'.join(flds.get('labels') or []),
+            **({'Theme': field_text(flds.get(THEME_FIELD))} if THEME_FIELD else {}),
         })
 
 print(f"Done! {len(issues)} issues saved to Jira_latest.csv")
