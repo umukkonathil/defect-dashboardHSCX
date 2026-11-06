@@ -120,13 +120,6 @@
   </div>
 </div>
 
-<div class="grid" style="grid-template-columns:minmax(0,560px);justify-content:center">
-  <div class="card">
-    <h2>Open vs Resolved <small style="color:#94a3b8;font-size:.75rem">(click segment)</small></h2>
-    <div class="chart-wrap"><canvas id="cOpen"></canvas></div>
-  </div>
-</div>
-
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
   <div class="card">
     <div class="card-head">
@@ -165,11 +158,6 @@
     <h2>Open defect backlog over time <small style="color:#94a3b8;font-size:.75rem">(weekly, last 12 months)</small></h2>
     <p class="sub">Open and active defects at the end of each week. A falling line means the team is closing the gap.</p>
     <div class="chart-wrap"><canvas id="cTrend"></canvas></div>
-  </div>
-  <div class="card tall">
-    <h2>Created vs resolved per week</h2>
-    <p class="sub">Shows whether the backlog moves because more tickets close or fewer are opened.</p>
-    <div class="chart-wrap"><canvas id="cFlow"></canvas></div>
     <div class="flow" id="flowText"></div>
   </div>
 </div>
@@ -315,7 +303,6 @@ function handler(field, map){
   };
 }
 
-new Chart('cOpen',{type:'doughnut',data:{labels:['Open / Active','Resolved / Closed'],datasets:[{data:[74,117],backgroundColor:['#ef4444','#22c55e'],borderWidth:2,borderColor:'#fff'}]},options:{cutout:'65%',responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:14,font:{size:12}}}}, ...handler('status',{'Open / Active':OPEN_ST,'Resolved / Closed':CLOSED_ST})}});
 const TREND = {"labels": ["Nov 3 '25", "Nov 10 '25", "Nov 17 '25", "Nov 24 '25", "Dec 1 '25", "Dec 8 '25", "Dec 15 '25", "Dec 22 '25", "Dec 29 '25", "Jan 5 '26", "Jan 12 '26", "Jan 19 '26", "Jan 26 '26", "Feb 2 '26", "Feb 9 '26", "Feb 16 '26", "Feb 23 '26", "Mar 2 '26", "Mar 9 '26", "Mar 16 '26", "Mar 23 '26", "Mar 30 '26", "Apr 6 '26", "Apr 13 '26", "Apr 20 '26", "Apr 27 '26", "May 4 '26", "May 11 '26", "May 18 '26", "May 25 '26", "Jun 1 '26", "Jun 8 '26", "Jun 15 '26", "Jun 22 '26", "Jun 29 '26", "Jul 6 '26", "Jul 13 '26", "Jul 20 '26", "Jul 27 '26", "Aug 3 '26", "Aug 10 '26", "Aug 17 '26", "Aug 24 '26", "Aug 31 '26", "Sep 7 '26", "Sep 14 '26", "Sep 21 '26", "Sep 28 '26", "Oct 5 '26", "Oct 12 '26", "Oct 19 '26", "Oct 26 '26", "Nov 2 '26 (so far)"], "open": [18, 24, 23, 23, 25, 27, 31, 33, 34, 38, 43, 46, 49, 48, 46, 42, 44, 45, 50, 52, 51, 50, 56, 56, 59, 62, 65, 65, 67, 65, 66, 66, 67, 67, 68, 73, 69, 72, 67, 66, 67, 67, 70, 65, 66, 72, 71, 72, 70, 77, 75, 75, 74], "created": [3, 7, 2, 0, 2, 4, 4, 2, 1, 8, 5, 3, 5, 2, 2, 1, 2, 1, 5, 3, 2, 0, 7, 5, 5, 4, 5, 5, 3, 1, 3, 2, 2, 0, 2, 7, 2, 5, 1, 1, 1, 0, 4, 1, 4, 8, 3, 5, 5, 7, 6, 4, 1], "resolved": [2, 1, 3, 0, 0, 2, 0, 0, 0, 4, 0, 0, 2, 3, 4, 5, 0, 0, 0, 1, 3, 1, 1, 5, 2, 1, 2, 5, 1, 3, 2, 2, 1, 0, 1, 2, 6, 2, 6, 2, 0, 0, 1, 6, 3, 2, 4, 4, 7, 0, 8, 4, 2], "flow": {"created_now": 4.0, "created_before": 2.4, "resolved_now": 3.2, "resolved_before": 2.3, "open_start": 67, "open_end": 74}, "verdict": "Backlog is growing mainly because more tickets are being opened (last 12 weeks vs the 12 before).", "undated": 0};
 const ENH = [{"key": "HEAL-861", "summary": "Proposed Enhancement Request for Awaiting Fulfillment Approval status in HealthSource. \"Resubmit to Logging.\"", "status": "To Do", "type": "Task", "priority": "Low", "reporter": "Ryan Tappa", "assignee": "", "created": "2025-10-17T09:49:52.558-0400", "resolved": "", "created_month": "2025-10", "resolved_month": "", "created_ts": "2025-10-17T09:49:52.558000-04:00", "resolved_ts": "", "theme": ""}];
 const ENH_LABEL = "enhancement";
@@ -413,17 +400,11 @@ document.querySelectorAll('.tog button').forEach(b => b.addEventListener('click'
 }));
 drawStatus(); drawType(); drawPriority();
 
-// ══ Backlog trend: open count per week, plus created vs resolved per week ══════
+// ══ Backlog trend: open count per week, plus a created-vs-resolved summary line ═══
 new Chart('cTrend', {type:'line',
   data:{labels:TREND.labels, datasets:[{label:'Open defects', data:TREND.open, borderColor:'#0052cc',
     backgroundColor:'rgba(0,82,204,.10)', fill:true, tension:.25, pointRadius:2, pointHoverRadius:5}]},
   options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-    scales:{x:{ticks:{maxTicksLimit:13, maxRotation:0}}, y:{beginAtZero:true, ticks:{precision:0}}}}});
-new Chart('cFlow', {type:'bar',
-  data:{labels:TREND.labels, datasets:[
-    {label:'Created',  data:TREND.created,  backgroundColor:'#f97316', borderRadius:3},
-    {label:'Resolved', data:TREND.resolved, backgroundColor:'#22c55e', borderRadius:3}]},
-  options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:14}}},
     scales:{x:{ticks:{maxTicksLimit:13, maxRotation:0}}, y:{beginAtZero:true, ticks:{precision:0}}}}});
 (function(){
   const f = TREND.flow, d = (a, b) => { const x = Math.round((a - b) * 10) / 10; return (x > 0 ? '+' : '') + x; };
