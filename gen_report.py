@@ -145,10 +145,17 @@ rep_colors = ['#0052cc','#0ea5e9','#6366f1','#f97316','#a855f7','#22c55e','#ec48
 rep_colors_js = json.dumps((rep_colors * (len(rep_labels)//len(rep_colors)+1))[:len(rep_labels)])
 
 # Build issues by created month — split by current status (open vs closed)
-all_months_set    = sorted(month_created.keys())
+# Created vs resolved per calendar month, last 12 months including the current one.
+# Created counts tickets by their created month; resolved counts them by their resolved month.
+_y, _m = date.today().year, date.today().month
+all_months_set = []
+for _ in range(12):
+    all_months_set.insert(0, f"{_y}-{_m:02d}")
+    _m -= 1
+    if _m == 0: _y, _m = _y - 1, 12
 month_labels_disp = [datetime.strptime(m, '%Y-%m').strftime('%b %Y') for m in all_months_set]
-created_open_monthly   = [sum(1 for r in rows if r['created_month']==m and r['status'] in open_statuses)   for m in all_months_set]
-created_closed_monthly = [sum(1 for r in rows if r['created_month']==m and r['status'] in closed_statuses) for m in all_months_set]
+monthly_created  = [month_created.get(m, 0)  for m in all_months_set]
+monthly_resolved = [month_resolved.get(m, 0) for m in all_months_set]
 all_months_js = json.dumps(all_months_set)
 
 # ── Backlog trend: weekly open count rebuilt from created / resolved dates ──────
@@ -502,7 +509,7 @@ html = f"""<!DOCTYPE html>
 
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card tall">
-    <h2>Issues by Created Month <small style="color:#94a3b8;font-size:.75rem">(click bar to drill in — open vs closed by current status)</small></h2>
+    <h2>Issues by Month — Created vs Resolved <small style="color:#94a3b8;font-size:.75rem">(last 12 months, click bar to drill in)</small></h2>
     <div class="chart-wrap"><canvas id="cMonthly"></canvas></div>
   </div>
 </div>
@@ -649,27 +656,32 @@ new Chart('cRep',{{type:'bar',data:{{labels:{json.dumps(rep_labels)},datasets:[{
 
 const MONTH_KEYS  = {all_months_js};
 const MONTH_DISPS = {json.dumps(month_labels_disp)};
+// Writes each bar's value just above it
+const barValues={{id:'barValues',afterDatasetsDraw(chart){{
+  const c=chart.ctx; c.save(); c.font="600 11px 'Segoe UI',Arial,sans-serif"; c.fillStyle='#334155'; c.textAlign='center'; c.textBaseline='bottom';
+  chart.data.datasets.forEach((ds,i)=>chart.getDatasetMeta(i).data.forEach((bar,k)=>c.fillText(ds.data[k],bar.x,bar.y-3)));
+  c.restore();
+}}}};
 new Chart('cMonthly',{{
   type:'bar',
+  plugins:[barValues],
   data:{{
     labels:MONTH_DISPS,
     datasets:[
-      {{label:'Still Open',     data:{json.dumps(created_open_monthly)},   backgroundColor:'rgba(14,165,233,0.8)', borderRadius:4}},
-      {{label:'Resolved/Closed',data:{json.dumps(created_closed_monthly)}, backgroundColor:'rgba(34,197,94,0.8)',  borderRadius:4}}
+      {{label:'Created',  data:{json.dumps(monthly_created)},  backgroundColor:'rgba(14,165,233,0.8)', borderRadius:4}},
+      {{label:'Resolved',data:{json.dumps(monthly_resolved)}, backgroundColor:'rgba(34,197,94,0.8)',  borderRadius:4}}
     ]
   }},
   options:{{
     responsive:true,maintainAspectRatio:false,
     plugins:{{legend:{{position:'top',labels:{{boxWidth:14,font:{{size:12}}}}}}}},
-    scales:{{y:{{beginAtZero:true,ticks:{{stepSize:1}}}},x:{{ticks:{{font:{{size:11}}}}}}}},
+    scales:{{y:{{beginAtZero:true,grace:'10%',ticks:{{precision:0}}}},x:{{ticks:{{font:{{size:11}}}}}}}},
     onClick(_,items){{
       if(!items.length) return;
-      const idx=items[0].index, dsIdx=items[0].datasetIndex;
+      const idx=items[0].index, created=items[0].datasetIndex===0;
       const mkey=MONTH_KEYS[idx], lbl=MONTH_DISPS[idx];
-      const stList = dsIdx===0 ? OPEN_ST : CLOSED_ST;
-      const label  = dsIdx===0 ? 'Still Open — '+lbl : 'Resolved/Closed — '+lbl;
-      cur = DATA.filter(r=>r.created_month===mkey && stList.includes(r.status));
-      document.getElementById('mtitle').textContent=label;
+      cur = DATA.filter(r=>(created ? r.created_month : r.resolved_month)===mkey);
+      document.getElementById('mtitle').textContent=(created ? 'Created — ' : 'Resolved — ')+lbl;
       document.getElementById('msearch').value='';
       sortKey = null;
       render();
