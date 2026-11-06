@@ -317,17 +317,11 @@ document.querySelectorAll('.tog button').forEach(b => b.addEventListener('click'
 }));
 drawStatus(); drawType(); drawPriority();
 
-// ══ Backlog trend: open count per week, plus created vs resolved per week ══════
+// ══ Backlog trend: open count per week, plus a created-vs-resolved summary line ═══
 new Chart('cTrend', {type:'line',
   data:{labels:TREND.labels, datasets:[{label:'Open defects', data:TREND.open, borderColor:'#0052cc',
     backgroundColor:'rgba(0,82,204,.10)', fill:true, tension:.25, pointRadius:2, pointHoverRadius:5}]},
   options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-    scales:{x:{ticks:{maxTicksLimit:13, maxRotation:0}}, y:{beginAtZero:true, ticks:{precision:0}}}}});
-new Chart('cFlow', {type:'bar',
-  data:{labels:TREND.labels, datasets:[
-    {label:'Created',  data:TREND.created,  backgroundColor:'#f97316', borderRadius:3},
-    {label:'Resolved', data:TREND.resolved, backgroundColor:'#22c55e', borderRadius:3}]},
-  options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{boxWidth:14}}},
     scales:{x:{ticks:{maxTicksLimit:13, maxRotation:0}}, y:{beginAtZero:true, ticks:{precision:0}}}}});
 (function(){
   const f = TREND.flow, d = (a, b) => { const x = Math.round((a - b) * 10) / 10; return (x > 0 ? '+' : '') + x; };
@@ -464,13 +458,6 @@ html = f"""<!DOCTYPE html>
   </div>
 </div>
 
-<div class="grid" style="grid-template-columns:minmax(0,560px);justify-content:center">
-  <div class="card">
-    <h2>Open vs Resolved <small style="color:#94a3b8;font-size:.75rem">(click segment)</small></h2>
-    <div class="chart-wrap"><canvas id="cOpen"></canvas></div>
-  </div>
-</div>
-
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
   <div class="card">
     <div class="card-head">
@@ -509,11 +496,6 @@ html = f"""<!DOCTYPE html>
     <h2>Open defect backlog over time <small style="color:#94a3b8;font-size:.75rem">(weekly, last 12 months)</small></h2>
     <p class="sub">Open and active defects at the end of each week. A falling line means the team is closing the gap.</p>
     <div class="chart-wrap"><canvas id="cTrend"></canvas></div>
-  </div>
-  <div class="card tall">
-    <h2>Created vs resolved per week</h2>
-    <p class="sub">Shows whether the backlog moves because more tickets close or fewer are opened.</p>
-    <div class="chart-wrap"><canvas id="cFlow"></canvas></div>
     <div class="flow" id="flowText"></div>
   </div>
 </div>
@@ -659,7 +641,6 @@ function handler(field, map){{
   }};
 }}
 
-new Chart('cOpen',{{type:'doughnut',data:{{labels:['Open / Active','Resolved / Closed'],datasets:[{{data:[{open_count},{closed_count}],backgroundColor:['#ef4444','#22c55e'],borderWidth:2,borderColor:'#fff'}}]}},options:{{cutout:'65%',responsive:true,maintainAspectRatio:false,plugins:{{legend:{{labels:{{boxWidth:14,font:{{size:12}}}}}}}}, ...handler('status',{{'Open / Active':OPEN_ST,'Resolved / Closed':CLOSED_ST}})}}}});
 const TREND = {json.dumps(trend)};
 const ENH = {json.dumps(enh_rows)};
 const ENH_LABEL = {json.dumps(ENHANCEMENT_LABEL)};
