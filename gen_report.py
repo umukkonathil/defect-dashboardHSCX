@@ -510,6 +510,7 @@ html = f"""<!DOCTYPE html>
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card tall">
     <h2>Issues by Month — Created vs Resolved <small style="color:#94a3b8;font-size:.75rem">(last 12 months, click bar to drill in)</small></h2>
+    <div id="monthTable" style="margin-bottom:18px"></div>
     <div class="chart-wrap"><canvas id="cMonthly"></canvas></div>
   </div>
 </div>
@@ -656,26 +657,19 @@ new Chart('cRep',{{type:'bar',data:{{labels:{json.dumps(rep_labels)},datasets:[{
 
 const MONTH_KEYS  = {all_months_js};
 const MONTH_DISPS = {json.dumps(month_labels_disp)};
-// Writes each bar's value just above it
-const barValues={{id:'barValues',afterDatasetsDraw(chart){{
-  const c=chart.ctx; c.save(); c.font="600 11px 'Segoe UI',Arial,sans-serif"; c.fillStyle='#334155'; c.textAlign='center'; c.textBaseline='bottom';
-  chart.data.datasets.forEach((ds,i)=>chart.getDatasetMeta(i).data.forEach((bar,k)=>c.fillText(ds.data[k],bar.x,bar.y-3)));
-  c.restore();
-}}}};
 new Chart('cMonthly',{{
   type:'bar',
-  plugins:[barValues],
   data:{{
     labels:MONTH_DISPS,
     datasets:[
-      {{label:'Created',  data:{json.dumps(monthly_created)},  backgroundColor:'rgba(14,165,233,0.8)', borderRadius:4}},
-      {{label:'Resolved',data:{json.dumps(monthly_resolved)}, backgroundColor:'rgba(34,197,94,0.8)',  borderRadius:4}}
+      {{label:'Created',  data:{json.dumps(monthly_created)},  backgroundColor:'#156082', borderRadius:4}},
+      {{label:'Resolved',data:{json.dumps(monthly_resolved)}, backgroundColor:'#E97132', borderRadius:4}}
     ]
   }},
   options:{{
     responsive:true,maintainAspectRatio:false,
     plugins:{{legend:{{position:'top',labels:{{boxWidth:14,font:{{size:12}}}}}}}},
-    scales:{{y:{{beginAtZero:true,grace:'10%',ticks:{{precision:0}}}},x:{{ticks:{{font:{{size:11}}}}}}}},
+    scales:{{y:{{beginAtZero:true,ticks:{{precision:0}}}},x:{{ticks:{{font:{{size:11}}}}}}}},
     onClick(_,items){{
       if(!items.length) return;
       const idx=items[0].index, created=items[0].datasetIndex===0;
@@ -690,6 +684,14 @@ new Chart('cMonthly',{{
     onHover(_,__,chart){{chart.canvas.style.cursor='pointer';}}
   }}
 }});
+
+// ── Monthly created vs resolved table (same numbers as the chart) ──
+(function(){{
+  const d = Chart.getChart('cMonthly').data;
+  let h='<table class="it" style="max-width:420px"><thead><tr><th>Month</th><th style="text-align:right">Created</th><th style="text-align:right">Resolved</th></tr></thead><tbody>';
+  d.labels.forEach((m,i)=>{{ h+=`<tr><td>${{m}}</td><td style="text-align:right">${{d.datasets[0].data[i]}}</td><td style="text-align:right">${{d.datasets[1].data[i]}}</td></tr>`; }});
+  document.getElementById('monthTable').innerHTML = h+'</tbody></table>';
+}})();
 
 // ── Top 10 Latest Defects ──
 const TOP10 = {top10_json};
