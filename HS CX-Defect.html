@@ -73,6 +73,8 @@
     .tog{display:inline-flex;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;flex-shrink:0;}
     .tog button{font:inherit;font-size:.72rem;font-weight:600;padding:4px 12px;border:0;background:white;color:#64748b;cursor:pointer;}
     .tog button[aria-pressed="true"]{background:#0052cc;color:white;}
+    .kpi .tog{margin-top:8px;}
+    .kpi .tog button{font-size:.68rem;padding:3px 11px;}
     .tog button:focus-visible{outline:2px solid #0ea5e9;outline-offset:-2px;}
     .sub{font-size:.78rem;color:#64748b;margin:-8px 0 14px;}
     .flow{margin-top:14px;padding:12px 16px;border-radius:10px;background:#f8fafc;font-size:.85rem;color:#334155;}
@@ -88,7 +90,7 @@
 
 <header>
   <div>
-    <h1>Jira Defect Dashboard <span style="font-weight:400;font-size:.95rem;opacity:.85;">&ndash; HEAL, ROIO &amp; ROIN issues reported by the HealthSource Product Support team in the last 12 months</span></h1>
+    <h1>Jira Defect Dashboard <span style="font-weight:400;font-size:.95rem;opacity:.85;">&ndash; HEAL, ROIO &amp; ROIN issues reported by the HealthSource Product Support team</span></h1>
     <p>Generated on 18 November 2026 &nbsp;|&nbsp; Source: Jira_latest.csv</p>
   </div>
   <div class="badge">188 Issues</div>
@@ -106,17 +108,26 @@
   <div class="kpi" style="--accent:#f97316" onclick="show('Blocked Issues','status',['Blocked'])">
     <div class="num">2</div><div class="lbl">Blocked</div><div class="hint">click to view</div>
   </div>
-  <div class="kpi" style="--accent:#6366f1" onclick="show('Bugs','type',['Bug'])">
-    <div class="num">113</div><div class="lbl">Bugs</div><div class="hint">click to view</div>
+  <div class="kpi" id="kBugs" style="--accent:#6366f1">
+    <div class="num"></div><div class="lbl"></div>
+    <div class="tog" role="group" aria-label="Open or all">
+      <button data-kpi="open" aria-pressed="true">Open</button><button data-kpi="all" aria-pressed="false">All</button>
+    </div>
   </div>
-  <div class="kpi" style="--accent:#0ea5e9" onclick="show('Critical Priority','priority',['Critical'])">
-    <div class="num">11</div><div class="lbl">Critical Priority</div><div class="hint">click to view</div>
+  <div class="kpi" id="kCrit" style="--accent:#0ea5e9">
+    <div class="num"></div><div class="lbl"></div>
+    <div class="tog" role="group" aria-label="Open or all">
+      <button data-kpi="open" aria-pressed="true">Open</button><button data-kpi="all" aria-pressed="false">All</button>
+    </div>
   </div>
   <div class="kpi" style="--accent:#8b5cf6" onclick="show('All Issues','all',[])">
     <div class="num">10</div><div class="lbl">Reporters</div><div class="hint">view all issues</div>
   </div>
-  <div class="kpi" style="--accent:#8b5cf6" onclick="document.getElementById('enhancements').scrollIntoView({behavior:'smooth'})">
-    <div class="num">3</div><div class="lbl">Enhancements</div><div class="hint">not counted above</div>
+  <div class="kpi" id="kEnh" style="--accent:#8b5cf6">
+    <div class="num"></div><div class="lbl"></div>
+    <div class="tog" role="group" aria-label="Open or all">
+      <button data-kpi="open" aria-pressed="true">Open</button><button data-kpi="all" aria-pressed="false">All</button>
+    </div>
   </div>
 </div>
 
@@ -165,7 +176,6 @@
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card tall">
     <h2>Issues by Month — Created vs Resolved <small style="color:#94a3b8;font-size:.75rem">(last 12 months, click bar to drill in)</small></h2>
-    <div id="monthTable" style="margin-bottom:18px"></div>
     <div class="chart-wrap"><canvas id="cMonthly"></canvas></div>
   </div>
 </div>
@@ -305,7 +315,7 @@ function handler(field, map){
 }
 
 const TREND = {"labels": ["Nov 17 '25", "Nov 24 '25", "Dec 1 '25", "Dec 8 '25", "Dec 15 '25", "Dec 22 '25", "Dec 29 '25", "Jan 5 '26", "Jan 12 '26", "Jan 19 '26", "Jan 26 '26", "Feb 2 '26", "Feb 9 '26", "Feb 16 '26", "Feb 23 '26", "Mar 2 '26", "Mar 9 '26", "Mar 16 '26", "Mar 23 '26", "Mar 30 '26", "Apr 6 '26", "Apr 13 '26", "Apr 20 '26", "Apr 27 '26", "May 4 '26", "May 11 '26", "May 18 '26", "May 25 '26", "Jun 1 '26", "Jun 8 '26", "Jun 15 '26", "Jun 22 '26", "Jun 29 '26", "Jul 6 '26", "Jul 13 '26", "Jul 20 '26", "Jul 27 '26", "Aug 3 '26", "Aug 10 '26", "Aug 17 '26", "Aug 24 '26", "Aug 31 '26", "Sep 7 '26", "Sep 14 '26", "Sep 21 '26", "Sep 28 '26", "Oct 5 '26", "Oct 12 '26", "Oct 19 '26", "Oct 26 '26", "Nov 2 '26", "Nov 9 '26", "Nov 16 '26 (so far)"], "open": [19, 19, 21, 23, 27, 29, 30, 34, 39, 42, 45, 44, 42, 39, 41, 42, 47, 49, 48, 47, 53, 53, 56, 59, 61, 61, 63, 62, 63, 63, 64, 64, 65, 70, 66, 69, 65, 64, 65, 65, 69, 64, 65, 71, 70, 71, 69, 76, 74, 74, 70, 57, 58], "created": [2, 0, 2, 4, 4, 2, 1, 8, 5, 3, 5, 2, 2, 2, 2, 1, 5, 3, 2, 0, 7, 5, 5, 4, 3, 5, 3, 1, 3, 2, 2, 0, 2, 7, 2, 5, 1, 1, 1, 0, 5, 1, 4, 8, 3, 5, 5, 7, 6, 4, 1, 1, 1], "resolved": [3, 0, 0, 2, 0, 0, 0, 4, 0, 0, 2, 3, 4, 5, 0, 0, 0, 1, 3, 1, 1, 5, 2, 1, 1, 5, 1, 2, 2, 2, 1, 0, 1, 2, 6, 2, 5, 2, 0, 0, 1, 6, 3, 2, 4, 4, 7, 0, 8, 4, 5, 14, 0], "flow": {"created_now": 4.2, "created_before": 2.2, "resolved_now": 4.8, "resolved_before": 1.9, "open_start": 69, "open_end": 58}, "verdict": "Backlog is falling mainly because more tickets are being closed (last 12 weeks vs the 12 before).", "undated": 0};
-const ENH = [{"key": "HEAL-9352", "summary": "NetSuite error creating account for international address - make State non-mandatory outside US/Canada", "status": "To Do", "type": "Bug", "priority": "Medium", "reporter": "Usha Mukkonathil", "assignee": "", "created": "2026-11-10T15:31:51.604-0500", "resolved": "", "created_month": "2026-11", "resolved_month": "", "created_ts": "2026-11-10T15:31:51.604000-05:00", "resolved_ts": "", "theme": ""}, {"key": "ROIO-244", "summary": "Springfield Clinic is requesting that we set up an integration like we have with Right Fax for eFax messenger", "status": "To Do", "type": "Product Feature Request", "priority": "Medium", "reporter": "Jamie Hegnet", "assignee": "Jim Bartolotta", "created": "2025-10-27T14:13:32.284-0400", "resolved": "", "created_month": "2025-10", "resolved_month": "", "created_ts": "2025-10-27T14:13:32.284000-04:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-861", "summary": "Proposed Enhancement Request for Awaiting Fulfillment Approval status in HealthSource. \"Resubmit to Logging.\"", "status": "To Do", "type": "Task", "priority": "Low", "reporter": "Ryan Tappa", "assignee": "", "created": "2025-10-17T09:49:52.558-0400", "resolved": "", "created_month": "2025-10", "resolved_month": "", "created_ts": "2025-10-17T09:49:52.558000-04:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-838", "summary": "Include 'Rescan' option in the indirect chase file to improve the duplogic", "status": "Won't Do", "type": "Story", "priority": "High", "reporter": "Usha Mukkonathil", "assignee": "Jim Bartolotta", "created": "2025-10-14T14:13:22.882-0400", "resolved": "2026-11-06T12:31:27.698-0500", "created_month": "2025-10", "resolved_month": "2026-11", "created_ts": "2025-10-14T14:13:22.882000-04:00", "resolved_ts": "2026-11-06T12:31:27.698000-05:00", "theme": ""}];
+const ENH = [{"key": "HEAL-9352", "summary": "NetSuite error creating account for international address - make State non-mandatory outside US/Canada", "status": "To Do", "type": "Bug", "priority": "Medium", "reporter": "Usha Mukkonathil", "assignee": "", "created": "2026-11-10T15:31:51.604-0500", "resolved": "", "created_month": "2026-11", "resolved_month": "", "created_ts": "2026-11-10T15:31:51.604000-05:00", "resolved_ts": "", "theme": ""}, {"key": "ROIO-244", "summary": "Springfield Clinic is requesting that we set up an integration like we have with Right Fax for eFax messenger", "status": "To Do", "type": "Product Feature Request", "priority": "Medium", "reporter": "Jamie Hegnet", "assignee": "Jim Bartolotta", "created": "2025-10-27T14:13:32.284-0400", "resolved": "", "created_month": "2025-10", "resolved_month": "", "created_ts": "2025-10-27T14:13:32.284000-04:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-861", "summary": "Proposed Enhancement Request for Awaiting Fulfillment Approval status in HealthSource. \"Resubmit to Logging.\"", "status": "To Do", "type": "Task", "priority": "Low", "reporter": "Ryan Tappa", "assignee": "", "created": "2025-10-17T09:49:52.558-0400", "resolved": "", "created_month": "2025-10", "resolved_month": "", "created_ts": "2025-10-17T09:49:52.558000-04:00", "resolved_ts": "", "theme": ""}];
 const ENH_LABEL = "enhancement";
 
 // ══ Defect breakdown charts: status / type / priority ══════════════════════════
@@ -393,13 +403,33 @@ function drawPriority(){
 }
 
 const redraw = {status:drawStatus, pri:drawPriority, type:drawType};
-document.querySelectorAll('.tog button').forEach(b => b.addEventListener('click', () => {
+document.querySelectorAll('.tog button[data-chart]').forEach(b => b.addEventListener('click', () => {
   const k = b.dataset.chart, m = b.dataset.mode;
   mode[k] = m;
   b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   redraw[k]();
 }));
 drawStatus(); drawType(); drawPriority();
+
+// ══ KPI cards with an Open / All switch (default Open) ═════════════════════════
+// Clicking the number or title lists the tickets behind it; the switch only changes the number.
+const KPI_SWITCHES = [
+  {id:'kBugs', name:'Bugs',              rows: all => (all ? DATA : OPEN_ROWS).filter(r => r.type==='Bug')},
+  {id:'kCrit', name:'Critical Priority', rows: all => (all ? DATA : OPEN_ROWS).filter(r => r.priority==='Critical')},
+  {id:'kEnh',  name:'Enhancements',      rows: all => all ? ENH : ENH.filter(r => !isClosed(r))},   // kept out of every defect count
+];
+KPI_SWITCHES.forEach(k => {
+  const el = document.getElementById(k.id);
+  let all = false;
+  const paint = () => {
+    el.querySelector('.num').textContent = k.rows(all).length;
+    el.querySelector('.lbl').textContent = (all ? 'All ' : 'Open ') + k.name;
+    el.querySelectorAll('.tog button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.kpi==='all') === all)));
+  };
+  el.addEventListener('click', () => showRows((all ? 'All ' : 'Open ') + k.name, k.rows(all)));
+  el.querySelectorAll('.tog button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); all = b.dataset.kpi==='all'; paint(); }));
+  paint();
+});
 
 // ══ Backlog trend: open count per week, plus a created-vs-resolved summary line ═══
 new Chart('cTrend', {type:'line',
@@ -465,14 +495,6 @@ new Chart('cMonthly',{
     onHover(_,__,chart){chart.canvas.style.cursor='pointer';}
   }
 });
-
-// ── Monthly created vs resolved table (same numbers as the chart) ──
-(function(){
-  const d = Chart.getChart('cMonthly').data;
-  let h='<table class="it" style="max-width:420px"><thead><tr><th>Month</th><th style="text-align:right">Created</th><th style="text-align:right">Resolved</th></tr></thead><tbody>';
-  d.labels.forEach((m,i)=>{ h+=`<tr><td>${m}</td><td style="text-align:right">${d.datasets[0].data[i]}</td><td style="text-align:right">${d.datasets[1].data[i]}</td></tr>`; });
-  document.getElementById('monthTable').innerHTML = h+'</tbody></table>';
-})();
 
 // ── Top 10 Latest Defects ──
 const TOP10 = [{"key": "HEAL-9499", "summary": "Shipping address not populating for COC STAT requests submitted via svc_pexapp_prod API", "status": "To Do", "type": "Bug", "priority": "Medium", "reporter": "Usha Mukkonathil", "assignee": "", "created": "2026-11-17T16:31:55.856-0500", "resolved": "", "created_month": "2026-11", "resolved_month": "", "created_ts": "2026-11-17T16:31:55.856000-05:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-9341", "summary": "Requests stuck in Package in progress - artifact process fails with [SMLOG_DATA_INSERT_FAILED] error", "status": "Done", "type": "Bug", "priority": "High", "reporter": "Usha Mukkonathil", "assignee": "Saravana Kolashi", "created": "2026-11-10T12:31:06.213-0500", "resolved": "2026-11-12T11:00:32.333-0500", "created_month": "2026-11", "resolved_month": "2026-11", "created_ts": "2026-11-10T12:31:06.213000-05:00", "resolved_ts": "2026-11-12T11:00:32.333000-05:00", "theme": ""}, {"key": "HEAL-9096", "summary": "Two Users Processed Same eRequest ID", "status": "In Progress", "type": "Bug", "priority": "High", "reporter": "Nichole McPherson", "assignee": "Saravana Kolashi", "created": "2026-11-02T13:46:25.323-0500", "resolved": "", "created_month": "2026-11", "resolved_month": "", "created_ts": "2026-11-02T13:46:25.323000-05:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-8968", "summary": "Verify Assist Next section is not showing as it should in Redesign", "status": "Done", "type": "Bug", "priority": "Medium", "reporter": "Jamie Hegnet", "assignee": "Aoife O'Beirn Leonard", "created": "2026-10-28T16:31:07.195-0400", "resolved": "2026-11-09T07:33:29.768-0500", "created_month": "2026-10", "resolved_month": "2026-11", "created_ts": "2026-10-28T16:31:07.195000-04:00", "resolved_ts": "2026-11-09T07:33:29.768000-05:00", "theme": ""}, {"key": "HEAL-8921", "summary": "Patient Transfer - Ship To information does not update/save", "status": "To Do", "type": "Task", "priority": "Medium", "reporter": "Schawntae Birk-Earley", "assignee": "", "created": "2026-10-27T10:03:44.074-0400", "resolved": "", "created_month": "2026-10", "resolved_month": "", "created_ts": "2026-10-27T10:03:44.074000-04:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-8907", "summary": "Redesign - Pop-out search allows secondary processing window with inactive site/eRequest search", "status": "Done", "type": "Bug", "priority": "High", "reporter": "Nichole McPherson", "assignee": "Nikita Danilov", "created": "2026-10-26T16:53:04.474-0400", "resolved": "2026-10-30T10:04:06.865-0400", "created_month": "2026-10", "resolved_month": "2026-10", "created_ts": "2026-10-26T16:53:04.474000-04:00", "resolved_ts": "2026-10-30T10:04:06.865000-04:00", "theme": ""}, {"key": "HEAL-8891", "summary": "STORK Incorrectly Marking Request Required Certification", "status": "In Progress", "type": "Bug", "priority": "Medium", "reporter": "Nichole McPherson", "assignee": "Richard Belcinski", "created": "2026-10-26T10:37:45.105-0400", "resolved": "", "created_month": "2026-10", "resolved_month": "", "created_ts": "2026-10-26T10:37:45.105000-04:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-8805", "summary": "Requests are being marked for certification workflow but not checked in UI for this workflow", "status": "To Do", "type": "Bug", "priority": "High", "reporter": "Jamie Hegnet", "assignee": "", "created": "2026-10-21T11:33:12.979-0400", "resolved": "", "created_month": "2026-10", "resolved_month": "", "created_ts": "2026-10-21T11:33:12.979000-04:00", "resolved_ts": "", "theme": ""}, {"key": "HEAL-8803", "summary": "Requests for Inactive/Closed sites are not able to open in Redesign", "status": "Done", "type": "Bug", "priority": "Medium", "reporter": "Jamie Hegnet", "assignee": "Nikita Danilov", "created": "2026-10-21T10:45:46.322-0400", "resolved": "2026-10-27T07:14:37.289-0400", "created_month": "2026-10", "resolved_month": "2026-10", "created_ts": "2026-10-21T10:45:46.322000-04:00", "resolved_ts": "2026-10-27T07:14:37.289000-04:00", "theme": ""}, {"key": "HEAL-8735", "summary": "Redesign: Non-Ship edit window loads indefinitely when attempting to delete a document", "status": "To Do", "type": "Bug", "priority": "Medium", "reporter": "Ryan Tappa", "assignee": "Nikita Danilov", "created": "2026-10-19T16:57:16.868-0400", "resolved": "", "created_month": "2026-10", "resolved_month": "", "created_ts": "2026-10-19T16:57:16.868000-04:00", "resolved_ts": "", "theme": ""}];
