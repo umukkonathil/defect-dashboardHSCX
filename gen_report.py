@@ -101,8 +101,6 @@ if unmapped:
 open_count = sum(statuses[s] for s in open_statuses)
 closed_count = sum(statuses[s] for s in closed_statuses)
 blocked_count = statuses.get('Blocked', 0)
-bug_count = issue_types.get('Bug', 0)
-critical_count = priorities.get('Critical', 0)
 reporter_count = len([r for r in reporters if r])
 
 top10 = sorted([r for r in rows if r.get('created_ts')], key=lambda r: r['created_ts'], reverse=True)[:10]
@@ -212,7 +210,6 @@ trend = {'labels': trend_labels, 'open': trend_open, 'created': trend_created, '
 # Enhancements: open first, newest first
 enh_rows.sort(key=lambda r: r['created_ts'], reverse=True)
 enh_rows.sort(key=lambda r: r['status'] in closed_statuses)
-enh_open = sum(1 for r in enh_rows if r['status'] not in closed_statuses)
 
 NEW_CSS = """
     .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid #e2e8f0;}
@@ -220,6 +217,8 @@ NEW_CSS = """
     .tog{display:inline-flex;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;flex-shrink:0;}
     .tog button{font:inherit;font-size:.72rem;font-weight:600;padding:4px 12px;border:0;background:white;color:#64748b;cursor:pointer;}
     .tog button[aria-pressed="true"]{background:#0052cc;color:white;}
+    .kpi .tog{margin-top:8px;}
+    .kpi .tog button{font-size:.68rem;padding:3px 11px;}
     .tog button:focus-visible{outline:2px solid #0ea5e9;outline-offset:-2px;}
     .sub{font-size:.78rem;color:#64748b;margin:-8px 0 14px;}
     .flow{margin-top:14px;padding:12px 16px;border-radius:10px;background:#f8fafc;font-size:.85rem;color:#334155;}
@@ -316,13 +315,33 @@ function drawPriority(){
 }
 
 const redraw = {status:drawStatus, pri:drawPriority, type:drawType};
-document.querySelectorAll('.tog button').forEach(b => b.addEventListener('click', () => {
+document.querySelectorAll('.tog button[data-chart]').forEach(b => b.addEventListener('click', () => {
   const k = b.dataset.chart, m = b.dataset.mode;
   mode[k] = m;
   b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   redraw[k]();
 }));
 drawStatus(); drawType(); drawPriority();
+
+// ══ KPI cards with an Open / All switch (default Open) ═════════════════════════
+// Clicking the number or title lists the tickets behind it; the switch only changes the number.
+const KPI_SWITCHES = [
+  {id:'kBugs', name:'Bugs',              rows: all => (all ? DATA : OPEN_ROWS).filter(r => r.type==='Bug')},
+  {id:'kCrit', name:'Critical Priority', rows: all => (all ? DATA : OPEN_ROWS).filter(r => r.priority==='Critical')},
+  {id:'kEnh',  name:'Enhancements',      rows: all => all ? ENH : ENH.filter(r => !isClosed(r))},   // kept out of every defect count
+];
+KPI_SWITCHES.forEach(k => {
+  const el = document.getElementById(k.id);
+  let all = false;
+  const paint = () => {
+    el.querySelector('.num').textContent = k.rows(all).length;
+    el.querySelector('.lbl').textContent = (all ? 'All ' : 'Open ') + k.name;
+    el.querySelectorAll('.tog button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.kpi==='all') === all)));
+  };
+  el.addEventListener('click', () => showRows((all ? 'All ' : 'Open ') + k.name, k.rows(all)));
+  el.querySelectorAll('.tog button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); all = b.dataset.kpi==='all'; paint(); }));
+  paint();
+});
 
 // ══ Backlog trend: open count per week, plus a created-vs-resolved summary line ═══
 new Chart('cTrend', {type:'line',
@@ -433,7 +452,7 @@ html = f"""<!DOCTYPE html>
 
 <header>
   <div>
-    <h1>Jira Defect Dashboard <span style="font-weight:400;font-size:.95rem;opacity:.85;">&ndash; HEAL, ROIO &amp; ROIN issues reported by the HealthSource Product Support team in the last 12 months</span></h1>
+    <h1>Jira Defect Dashboard <span style="font-weight:400;font-size:.95rem;opacity:.85;">&ndash; HEAL, ROIO &amp; ROIN issues reported by the HealthSource Product Support team</span></h1>
     <p>Generated on {today} &nbsp;|&nbsp; Source: Jira_latest.csv</p>
   </div>
   <div class="badge">{total} Issues</div>
@@ -451,17 +470,26 @@ html = f"""<!DOCTYPE html>
   <div class="kpi" style="--accent:#f97316" onclick="show('Blocked Issues','status',['Blocked'])">
     <div class="num">{blocked_count}</div><div class="lbl">Blocked</div><div class="hint">click to view</div>
   </div>
-  <div class="kpi" style="--accent:#6366f1" onclick="show('Bugs','type',['Bug'])">
-    <div class="num">{bug_count}</div><div class="lbl">Bugs</div><div class="hint">click to view</div>
+  <div class="kpi" id="kBugs" style="--accent:#6366f1">
+    <div class="num"></div><div class="lbl"></div>
+    <div class="tog" role="group" aria-label="Open or all">
+      <button data-kpi="open" aria-pressed="true">Open</button><button data-kpi="all" aria-pressed="false">All</button>
+    </div>
   </div>
-  <div class="kpi" style="--accent:#0ea5e9" onclick="show('Critical Priority','priority',['Critical'])">
-    <div class="num">{critical_count}</div><div class="lbl">Critical Priority</div><div class="hint">click to view</div>
+  <div class="kpi" id="kCrit" style="--accent:#0ea5e9">
+    <div class="num"></div><div class="lbl"></div>
+    <div class="tog" role="group" aria-label="Open or all">
+      <button data-kpi="open" aria-pressed="true">Open</button><button data-kpi="all" aria-pressed="false">All</button>
+    </div>
   </div>
   <div class="kpi" style="--accent:#8b5cf6" onclick="show('All Issues','all',[])">
     <div class="num">{reporter_count}</div><div class="lbl">Reporters</div><div class="hint">view all issues</div>
   </div>
-  <div class="kpi" style="--accent:#8b5cf6" onclick="document.getElementById('enhancements').scrollIntoView({{behavior:'smooth'}})">
-    <div class="num">{enh_open}</div><div class="lbl">Enhancements</div><div class="hint">not counted above</div>
+  <div class="kpi" id="kEnh" style="--accent:#8b5cf6">
+    <div class="num"></div><div class="lbl"></div>
+    <div class="tog" role="group" aria-label="Open or all">
+      <button data-kpi="open" aria-pressed="true">Open</button><button data-kpi="all" aria-pressed="false">All</button>
+    </div>
   </div>
 </div>
 
@@ -510,7 +538,6 @@ html = f"""<!DOCTYPE html>
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card tall">
     <h2>Issues by Month — Created vs Resolved <small style="color:#94a3b8;font-size:.75rem">(last 12 months, click bar to drill in)</small></h2>
-    <div id="monthTable" style="margin-bottom:18px"></div>
     <div class="chart-wrap"><canvas id="cMonthly"></canvas></div>
   </div>
 </div>
@@ -684,14 +711,6 @@ new Chart('cMonthly',{{
     onHover(_,__,chart){{chart.canvas.style.cursor='pointer';}}
   }}
 }});
-
-// ── Monthly created vs resolved table (same numbers as the chart) ──
-(function(){{
-  const d = Chart.getChart('cMonthly').data;
-  let h='<table class="it" style="max-width:420px"><thead><tr><th>Month</th><th style="text-align:right">Created</th><th style="text-align:right">Resolved</th></tr></thead><tbody>';
-  d.labels.forEach((m,i)=>{{ h+=`<tr><td>${{m}}</td><td style="text-align:right">${{d.datasets[0].data[i]}}</td><td style="text-align:right">${{d.datasets[1].data[i]}}</td></tr>`; }});
-  document.getElementById('monthTable').innerHTML = h+'</tbody></table>';
-}})();
 
 // ── Top 10 Latest Defects ──
 const TOP10 = {top10_json};
