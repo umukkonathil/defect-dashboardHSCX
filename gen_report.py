@@ -538,7 +538,6 @@ html = f"""<!DOCTYPE html>
 <div class="grid" style="grid-template-columns:1fr">
   <div class="card tall">
     <h2>Issues by Month — Created vs Resolved <small style="color:#94a3b8;font-size:.75rem">(last 12 months, click bar to drill in)</small></h2>
-    <div id="monthTable" style="margin-bottom:18px"></div>
     <div class="chart-wrap"><canvas id="cMonthly"></canvas></div>
   </div>
 </div>
@@ -712,14 +711,6 @@ new Chart('cMonthly',{{
     onHover(_,__,chart){{chart.canvas.style.cursor='pointer';}}
   }}
 }});
-
-// ── Monthly created vs resolved table (same numbers as the chart) ──
-(function(){{
-  const d = Chart.getChart('cMonthly').data;
-  let h='<table class="it" style="max-width:420px"><thead><tr><th>Month</th><th style="text-align:right">Created</th><th style="text-align:right">Resolved</th></tr></thead><tbody>';
-  d.labels.forEach((m,i)=>{{ h+=`<tr><td>${{m}}</td><td style="text-align:right">${{d.datasets[0].data[i]}}</td><td style="text-align:right">${{d.datasets[1].data[i]}}</td></tr>`; }});
-  document.getElementById('monthTable').innerHTML = h+'</tbody></table>';
-}})();
 
 // ── Top 10 Latest Defects ──
 const TOP10 = {top10_json};
