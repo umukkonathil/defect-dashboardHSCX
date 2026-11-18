@@ -452,7 +452,7 @@ html = f"""<!DOCTYPE html>
 
 <header>
   <div>
-    <h1>Jira Defect Dashboard <span style="font-weight:400;font-size:.95rem;opacity:.85;">&ndash; HEAL, ROIO &amp; ROIN issues reported by the HealthSource Product Support team in the last 12 months</span></h1>
+    <h1>Jira Defect Dashboard <span style="font-weight:400;font-size:.95rem;opacity:.85;">&ndash; HEAL, ROIO &amp; ROIN issues reported by the HealthSource Product Support team</span></h1>
     <p>Generated on {today} &nbsp;|&nbsp; Source: Jira_latest.csv</p>
   </div>
   <div class="badge">{total} Issues</div>
